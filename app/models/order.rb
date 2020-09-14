@@ -128,7 +128,8 @@ class Order < ApplicationRecord
     def cancel(id)
       ActiveRecord::Base.transaction do
         order = lock.find_by_id!(id)
-        return unless order.state == ::Order::WAIT
+        market_engine = order.market.engine
+        return unless order.state == ::Order::WAIT && market_engine.driver == "peatio"
 
         order.hold_account!.unlock_funds!(order.locked)
         order.record_cancel_operations!
@@ -228,6 +229,12 @@ class Order < ApplicationRecord
       taker_fee:     taker_fee,
       locked:        locked,
       state:         read_attribute_before_type_cast(:state) }
+  end
+
+  def as_json_for_third_party
+    {
+        uuid: uuid
+    }
   end
 
   # @deprecated

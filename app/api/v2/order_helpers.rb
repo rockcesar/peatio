@@ -78,9 +78,15 @@ module API
         AMQP::Queue.enqueue(:matching, action: 'cancel', order: order.to_matching_attributes)
 
         # Notify third party trading engine about order stop.
+        # Outdated
         AMQP::Queue.enqueue(:events_processor,
                           subject: :stop_order,
                           payload: order.as_json_for_events_processor)
+
+        # Notify third party trading engine about order stop.
+        AMQP::Queue.publish('finex',
+                            data: Order.last.as_json_for_third_party,
+                            type: 3)
       end
 
       def order_param
