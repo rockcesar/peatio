@@ -64,29 +64,37 @@ module API
 
         order.save!
 
+        # FIXME: Need to send the message to third-party engine.
         AMQP::Queue.enqueue(:order_processor,
                           { action: 'submit', order: order.attributes },
                           { persistent: false })
 
-        # Notify third party trading engine about order submit.
-        AMQP::Queue.enqueue(:events_processor,
-                          subject: :submit_order,
-                          payload: order.as_json_for_events_processor)
       end
 
       def cancel_order(order)
+        market_engine = order.market.engine
+
+        if market_engine.driver == "peatio"
+          cancel_peatio_order(order)
+        else
+          cancel_third_party_order(market_engine.driver, order)
+        end
+      end
+
+      def cancel_peatio_order(order)
         AMQP::Queue.enqueue(:matching, action: 'cancel', order: order.to_matching_attributes)
+      end
 
-        # Notify third party trading engine about order stop.
-        # Outdated
-        AMQP::Queue.enqueue(:events_processor,
-                          subject: :stop_order,
-                          payload: order.as_json_for_events_processor)
-
-        # Notify third party trading engine about order stop.
-        AMQP::Queue.publish('finex',
-                            data: Order.last.as_json_for_third_party,
+      def cancel_third_party_order(engine_driver, order)
+        AMQP::Queue.publish(engine_driver,
+                            data: order.as_json_for_third_party,
                             type: 3)
+      end
+
+      def bulk_cancel_third_party_order(engine_driver, filters = {})
+        AMQP::Queue.publish(engine_driver,
+                            data: filters,
+                            type: 4)
       end
 
       def order_param

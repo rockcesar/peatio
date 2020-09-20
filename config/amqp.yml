@@ -17,7 +17,7 @@ exchange:
   events:
     name: peatio.events
     type: direct
-  finex:
+  finex-spot:
     name: finex.orderapi
     type: direct
 

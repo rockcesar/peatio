@@ -42,7 +42,7 @@ module API
         end
 
         desc 'Cancel specific order' do
-          @settings[:scope] = :read_orders
+          @settings[:scope] = :write_orders
           success API::V2::Management::Entities::Order
         end
         params do
@@ -63,6 +63,41 @@ module API
 
           present order, with: API::V2::Management::Entities::Order
           status 200
+        end
+
+        desc 'Cancel all orders' do
+          @settings[:scope] = :write_orders
+          success API::V2::Management::Entities::Order
+        end
+        params do
+          optional :member_uid,
+                   type: String
+          requires :market,
+                   values: { value: -> { ::Market.active.ids }, message: 'management.order.market_doesnt_exist' },
+                   desc: -> { API::V2::Management::Entities::Order.documentation[:market_id][:desc] }
+        end
+
+        post '/orders/cancel' do
+          market = Market.find(params[:market])
+          engine_driver = market.engine.driver
+
+          if engine_driver == 'peatio'
+            ransack_params = API::V2::Admin::Helpers::RansackBuilder.new(params)
+                                                                    .eq(:member_uid)
+                                                                    .translate(market: :market_id)
+                                                                    .build
+
+            orders = Order.ransack(ransack_params).result
+            orders.each { |order| cancel_peatio_order(order) }
+          else
+            filters = {
+              market_id: market.id,
+              member_uid: member_uid
+            }.compact
+
+            bulk_cancel_third_party_order(engine_driver, filters)
+          end
+          status 204
         end
       end
     end

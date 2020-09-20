@@ -126,11 +126,11 @@ class Order < ApplicationRecord
     end
 
     def cancel(id)
+      order = lock.find_by_id!(id)
+      market_engine = order.market.engine
+      return unless order.state == ::Order::WAIT && market_engine.driver == "peatio"
+      
       ActiveRecord::Base.transaction do
-        order = lock.find_by_id!(id)
-        market_engine = order.market.engine
-        return unless order.state == ::Order::WAIT && market_engine.driver == "peatio"
-
         order.hold_account!.unlock_funds!(order.locked)
         order.record_cancel_operations!
 
@@ -233,7 +233,8 @@ class Order < ApplicationRecord
 
   def as_json_for_third_party
     {
-        uuid: uuid
+        uuid: uuid,
+        market_id: market_id
     }
   end
 
