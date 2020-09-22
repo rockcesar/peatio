@@ -3,7 +3,7 @@ name: default
 
 services:
 - name: database
-  image: mysql:5.7
+  image: mariadb:10.3
   ports:
     - 3306
   environment:
